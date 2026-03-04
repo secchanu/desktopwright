@@ -8,6 +8,7 @@ GUI automation CLI tool for AI agents and E2E testing. Inspect UI elements, clic
 
 - **Accessibility-first**: inspect UI trees via the platform's accessibility API and interact by element name or `[ref=eN]` — no fragile coordinates required
 - **Screenshot capture**: capture any window and detect visual changes with `--wait-for-diff`
+- **Pixel-accurate clicking**: coordinates from `capture --hwnd N` can be passed directly to `click --coord window --hwnd N` — no DPI scaling math required, even across multi-monitor setups
 - **Full input control**: mouse, keyboard, drag, scroll
 - **JSON output**: every command supports `--json` for machine-readable results
 - **AI agent ready**: install a [Claude Code](https://github.com/anthropics/claude-code) skill with a single command so any Claude session can drive it immediately

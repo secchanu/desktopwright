@@ -28,13 +28,16 @@ use cli::{
 };
 
 fn main() -> Result<()> {
-    // xcap（物理ピクセル）と Win32 座標系（ClientToScreen + SendInput）を一致させるため
-    // プロセス全体を System DPI-Aware に設定する。
-    // これにより、キャプチャ画像上の座標をそのままクリック座標として使用できる。
+    // Per-Monitor DPI-Aware V2 に設定することで、すべての Win32 座標 API が
+    // 物理ピクセルを返すようにする。SetProcessDPIAware（System DPI Aware）では
+    // マルチモニター環境で論理ピクセルが混在し、異なる DPI のモニターへのクリックが
+    // ずれる問題が発生する。
     #[cfg(windows)]
     unsafe {
-        use windows::Win32::UI::WindowsAndMessaging::SetProcessDPIAware;
-        let _ = SetProcessDPIAware();
+        use windows::Win32::UI::HiDpi::{
+            DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
+        };
+        let _ = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     }
 
     let cli = Cli::parse();

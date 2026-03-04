@@ -1,5 +1,6 @@
 use anyhow::{Result, anyhow};
-use windows::Win32::Foundation::{HANDLE, LPARAM, POINT, WPARAM};
+use windows::Win32::Foundation::{HANDLE, LPARAM, POINT, RECT, WPARAM};
+use windows::Win32::Graphics::Dwm::{DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute};
 use windows::Win32::Graphics::Gdi::{ClientToScreen, ScreenToClient};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
@@ -9,15 +10,16 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetDoubleClickTime, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBD_EVENT_FLAGS, KEYBDINPUT,
     KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC, MOUSE_EVENT_FLAGS, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_HWHEEL,
     MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
-    MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT,
-    MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DELETE, VK_DOWN,
-    VK_END, VK_ESCAPE, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10,
-    VK_F11, VK_F12, VK_HOME, VK_INSERT, VK_LEFT, VK_LWIN, VK_MENU, VK_NEXT, VK_PRIOR, VK_RETURN,
-    VK_RIGHT, VK_SHIFT, VK_SPACE, VK_TAB, VK_UP,
+    MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_VIRTUALDESK,
+    MOUSEEVENTF_WHEEL, MOUSEINPUT, MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_BACK, VK_CAPITAL,
+    VK_CONTROL, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6,
+    VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_HOME, VK_INSERT, VK_LEFT, VK_LWIN, VK_MENU,
+    VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_SPACE, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetSystemMetrics, PostMessageW, SM_CXSCREEN, SM_CYSCREEN, SetForegroundWindow, WM_LBUTTONDOWN,
-    WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP,
+    GetSystemMetrics, PostMessageW, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    SM_YVIRTUALSCREEN, SetForegroundWindow, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN,
+    WM_MBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP,
 };
 
 use crate::core::platform::InputController;
@@ -128,7 +130,7 @@ impl WindowsInputController {
         }
     }
 
-    /// スクリーン座標に変換する（CoordMode::Windowの場合はHWND基準でClientToScreenを呼ぶ）
+    /// スクリーン座標に変換する（CoordMode::Windowの場合はHWND基準でDWMフレームを使う）
     fn to_screen_coords(
         x: i32,
         y: i32,
@@ -140,6 +142,27 @@ impl WindowsInputController {
             CoordMode::Window => {
                 let h = hwnd.ok_or_else(|| anyhow!("ウィンドウ相対座標にはHWNDが必要です"))?;
                 let hwnd = to_hwnd(h);
+
+                // xcap は DWM extended frame bounds の左上を原点にキャプチャする。
+                // capture で取得した画像座標をそのまま --coord window に渡せるよう、
+                // スクリーン座標を frame.left + x, frame.top + y で計算する。
+                // ClientToScreen を使うと DWM フレームとクライアント領域の差分（通常 x:1px, y:31px）
+                // だけずれるため使用しない。
+                let mut frame = RECT::default();
+                if unsafe {
+                    DwmGetWindowAttribute(
+                        hwnd,
+                        DWMWA_EXTENDED_FRAME_BOUNDS,
+                        std::ptr::addr_of_mut!(frame).cast(),
+                        std::mem::size_of::<RECT>() as u32,
+                    )
+                }
+                .is_ok()
+                {
+                    return Ok((frame.left + x, frame.top + y));
+                }
+
+                // DWM が使えない場合は ClientToScreen でフォールバック
                 let mut pt = POINT { x, y };
                 unsafe {
                     let _ = ClientToScreen(hwnd, &mut pt);
@@ -175,15 +198,16 @@ impl WindowsInputController {
 
     /// マウスを絶対座標に移動するINPUTを作成する
     ///
-    /// 座標系: `SetProcessDPIAware` により物理ピクセル座標を使用する。
+    /// MOUSEEVENTF_VIRTUALDESK を使い、仮想デスクトップ全体（全モニター）に対して
+    /// 正規化することでマルチモニター環境でも正確にクリックできる。
     /// xcap によるキャプチャ画像の座標をそのまま click --coord window に渡せる。
-    /// ただし DWM 拡張フレーム境界（ウィンドウシャドウを含む）分のオフセットが
-    /// xcap クライアント原点とズレる場合がある点に注意。
     fn make_mouse_move_input(x: i32, y: i32) -> INPUT {
-        let screen_w = unsafe { GetSystemMetrics(SM_CXSCREEN) };
-        let screen_h = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-        let norm_x = (x * 65535 / screen_w.max(1)) as i32;
-        let norm_y = (y * 65535 / screen_h.max(1)) as i32;
+        let virt_x = unsafe { GetSystemMetrics(SM_XVIRTUALSCREEN) };
+        let virt_y = unsafe { GetSystemMetrics(SM_YVIRTUALSCREEN) };
+        let virt_w = unsafe { GetSystemMetrics(SM_CXVIRTUALSCREEN) };
+        let virt_h = unsafe { GetSystemMetrics(SM_CYVIRTUALSCREEN) };
+        let norm_x = ((x - virt_x) * 65535 / virt_w.max(1)) as i32;
+        let norm_y = ((y - virt_y) * 65535 / virt_h.max(1)) as i32;
 
         INPUT {
             r#type: INPUT_MOUSE,
@@ -192,7 +216,7 @@ impl WindowsInputController {
                     dx: norm_x,
                     dy: norm_y,
                     mouseData: 0,
-                    dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
+                    dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
                     time: 0,
                     dwExtraInfo: 0,
                 },

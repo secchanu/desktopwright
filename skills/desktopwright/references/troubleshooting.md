@@ -63,31 +63,23 @@ desktopwright capture --target "アプリ" --output screen.png
 
 ---
 
-## 座標がズレる (DPIスケーリング)
+## 座標の扱い
 
-### 症状
+### `capture` 画像の座標をそのまま `--coord window` に使う
 
-125%・150%などの高DPI設定環境で、`capture` 画像上の座標と `click --coord window` 座標がズレる。
-
-**原因**: `capture` は物理ピクセル座標で画像を返すが、`--coord window` は Win32 ロジカル座標を
-使用する。125% DPI では物理座標 ÷ 1.25 = ロジカル座標になる。
-
-gpui（Zed フレームワーク）など Per-Monitor DPI-Aware なアプリでは特にこのズレが発生する。
-
-**対処**: キャプチャ画像上の座標を DPI スケール係数で割って click 座標に使う。
+`capture --hwnd N` で取得した画像のピクセル座標は、`--coord window --hwnd N` にそのまま渡せる。
+DPI スケール（125%・150% 等）やマルチモニター環境でも変換は不要。
 
 ```bash
-# DPI 125% の場合: 画像上の (760, 508) → click 座標は (608, 406)
-# 計算式: click_x = capture_x / 1.25, click_y = capture_y / 1.25
-
-desktopwright click --x 608 --y 406 --coord window --hwnd <hwnd>
+# capture で取得した画像上の座標 (x=400, y=300) を直接 click に使う
+desktopwright capture --hwnd 132456 --output screen.png
+desktopwright click --x 400 --y 300 --coord window --hwnd 132456
 ```
 
-DPI スケール係数の確認方法：
-- Windows 設定 → ディスプレイ → 拡大縮小とレイアウト → テキスト、アプリ、その他の項目のサイズを変更する
-- 125% → 係数 1.25、150% → 係数 1.5、100% → 係数 1.0（ズレなし）
+### `--coord screen` との混同に注意
 
-**代替手段**: UIA が使えるアプリなら `click-element --text "ボタン名"` で座標不要のクリックが可能。
+`capture --hwnd N` の画像座標を `--coord screen`（デフォルト）に渡すと、
+ウィンドウのスクリーン上の位置分だけズレる。必ず `--coord window --hwnd N` を使うこと。
 
 ---
 
@@ -178,7 +170,7 @@ desktopwright focus --hwnd 2690012
 
 gpui は Win32 UI Automation に対応していないため、`ui-tree`/`snapshot`/`click-element` は最小限の情報しか返さない。
 
-**操作方法**: `capture` でスクリーンショットを撮り、AI に座標を特定させてから `click --coord window` で操作する。DPI スケーリングに注意（上記「座標がズレる」参照）。
+**操作方法**: `capture --hwnd N` でスクリーンショットを撮り、AI に座標を特定させてから `click --x X --y Y --coord window --hwnd N` で操作する。画像の座標をそのまま使えるため、DPI スケール等の変換は不要。
 
 ---
 
