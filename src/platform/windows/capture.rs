@@ -1,8 +1,8 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use image::{DynamicImage, ImageBuffer, Rgba};
 use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{POINT, RECT};
-use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
+use windows::Win32::Graphics::Dwm::{DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute};
 use windows::Win32::UI::WindowsAndMessaging::GetPhysicalCursorPos;
 use xcap::Window;
 
@@ -26,7 +26,11 @@ impl WindowsScreenCapture {
             .into_iter()
             .find(|w| w.id().ok().map_or(false, |id| id as usize == hwnd))
             .ok_or_else(|| {
-                DesktopError::WindowNotFound(format!("HWND {} のxcapウィンドウが見つかりません", hwnd)).into()
+                DesktopError::WindowNotFound(format!(
+                    "HWND {} のxcapウィンドウが見つかりません",
+                    hwnd
+                ))
+                .into()
             })
     }
 
@@ -50,7 +54,11 @@ impl WindowsScreenCapture {
     }
 
     /// 最大サイズにリサイズする（アスペクト比を維持）
-    fn apply_max_size(img: DynamicImage, max_width: Option<u32>, max_height: Option<u32>) -> DynamicImage {
+    fn apply_max_size(
+        img: DynamicImage,
+        max_width: Option<u32>,
+        max_height: Option<u32>,
+    ) -> DynamicImage {
         let (w, h) = (img.width(), img.height());
         let scale_w = max_width.map(|mw| mw as f32 / w as f32).unwrap_or(1.0);
         let scale_h = max_height.map(|mh| mh as f32 / h as f32).unwrap_or(1.0);
@@ -103,7 +111,7 @@ impl WindowsScreenCapture {
         let frame_w = frame.right - frame.left;
         let frame_h = frame.bottom - frame.top;
         let left_inset = frame_w - img_w; // 通常 0
-        let top_inset = frame_h - img_h;  // 通常 1（Win11 非最大化時）
+        let top_inset = frame_h - img_h; // 通常 1（Win11 非最大化時）
 
         let cx = cursor.x - frame.left - left_inset;
         let cy = cursor.y - frame.top - top_inset;
@@ -151,8 +159,18 @@ impl WindowsScreenCapture {
         if w != w2 || h != h2 {
             return DiffResult {
                 changed: true,
-                changed_regions: vec![Rect { x: 0, y: 0, width: w as i32, height: h as i32 }],
-                bounding_box: Some(Rect { x: 0, y: 0, width: w as i32, height: h as i32 }),
+                changed_regions: vec![Rect {
+                    x: 0,
+                    y: 0,
+                    width: w as i32,
+                    height: h as i32,
+                }],
+                bounding_box: Some(Rect {
+                    x: 0,
+                    y: 0,
+                    width: w as i32,
+                    height: h as i32,
+                }),
             };
         }
 

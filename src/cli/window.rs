@@ -47,7 +47,10 @@ pub fn run_window(args: &WindowArgs, manager: &dyn WindowManager) -> Result<()> 
         WindowAction::Restore => WindowState::Restore,
     };
     manager.set_window_state(window.hwnd, state)?;
-    eprintln!("{:?}: \"{}\" (HWND: {})", args.action, window.title, window.hwnd);
+    eprintln!(
+        "{:?}: \"{}\" (HWND: {})",
+        args.action, window.title, window.hwnd
+    );
     Ok(())
 }
 

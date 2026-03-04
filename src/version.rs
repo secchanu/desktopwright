@@ -6,9 +6,7 @@
 pub fn check_latest_version(current: &str) {
     // 別スレッドで非同期に確認し、タイムアウトで諦める
     let current = current.to_string();
-    let handle = std::thread::spawn(move || {
-        check_latest_version_inner(&current)
-    });
+    let handle = std::thread::spawn(move || check_latest_version_inner(&current));
 
     // 2秒待って終わらなければ諦める
     match handle.join() {

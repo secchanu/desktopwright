@@ -34,11 +34,22 @@ pub fn run_get_text(
 ) -> Result<()> {
     let window = manager.find_window(&args.window.resolve()?)?;
 
-    let match_mode = if args.exact { TextMatchMode::Exact } else { TextMatchMode::Contains };
+    let match_mode = if args.exact {
+        TextMatchMode::Exact
+    } else {
+        TextMatchMode::Contains
+    };
     let search_text = args.text.as_deref().unwrap_or("");
 
     let node = automation
-        .find_element(window.hwnd, search_text, args.role.as_deref(), 0, match_mode, args.timeout)?
+        .find_element(
+            window.hwnd,
+            search_text,
+            args.role.as_deref(),
+            0,
+            match_mode,
+            args.timeout,
+        )?
         .ok_or_else(|| anyhow::anyhow!("要素が見つかりませんでした: {:?}", search_text))?;
 
     // value（入力フィールドの現在値）があればそれを、なければアクセシブル名を出力する

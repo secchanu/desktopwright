@@ -1,15 +1,14 @@
 use anyhow::Result;
 use std::path::PathBuf;
 use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
-use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
+use windows::Win32::Graphics::Dwm::{DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute};
 use windows::Win32::System::Threading::{
-    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetClassNameW, GetForegroundWindow, GetWindowRect, GetWindowTextW,
-    GetWindowThreadProcessId, IsIconic, IsWindowVisible, PostMessageW, SetForegroundWindow,
-    SetWindowPos, ShowWindow, SWP_NOMOVE, SWP_NOZORDER, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE,
-    WM_CLOSE,
+    GetWindowThreadProcessId, IsIconic, IsWindowVisible, PostMessageW, SW_MAXIMIZE, SW_MINIMIZE,
+    SW_RESTORE, SWP_NOMOVE, SWP_NOZORDER, SetForegroundWindow, SetWindowPos, ShowWindow, WM_CLOSE,
 };
 use windows::core::BOOL;
 
@@ -54,7 +53,14 @@ impl WindowsWindowManager {
                 Ok(h) => {
                     let mut buf = vec![0u16; 512];
                     let mut len = buf.len() as u32;
-                    if QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, windows::core::PWSTR(buf.as_mut_ptr()), &mut len).is_ok() {
+                    if QueryFullProcessImageNameW(
+                        h,
+                        PROCESS_NAME_WIN32,
+                        windows::core::PWSTR(buf.as_mut_ptr()),
+                        &mut len,
+                    )
+                    .is_ok()
+                    {
                         let path = String::from_utf16_lossy(&buf[..len as usize]);
                         PathBuf::from(path)
                             .file_stem()
@@ -95,7 +101,9 @@ impl WindowsWindowManager {
             }
         } else {
             let mut rect = RECT::default();
-            unsafe { let _ = GetWindowRect(hwnd, &mut rect); };
+            unsafe {
+                let _ = GetWindowRect(hwnd, &mut rect);
+            };
             Rect {
                 x: rect.left,
                 y: rect.top,
@@ -138,15 +146,16 @@ impl WindowsWindowManager {
     fn matches_target(info: &WindowInfo, target: &WindowTarget) -> bool {
         match target {
             WindowTarget::Hwnd(h) => info.hwnd == *h,
-            WindowTarget::Title(t) => {
-                info.title.to_lowercase().contains(&t.to_lowercase())
-            }
+            WindowTarget::Title(t) => info.title.to_lowercase().contains(&t.to_lowercase()),
             WindowTarget::ProcessName(p) => {
                 info.process_name.to_lowercase().contains(&p.to_lowercase())
             }
             WindowTarget::TitleAndProcess { title, process } => {
                 info.title.to_lowercase().contains(&title.to_lowercase())
-                    && info.process_name.to_lowercase().contains(&process.to_lowercase())
+                    && info
+                        .process_name
+                        .to_lowercase()
+                        .contains(&process.to_lowercase())
             }
         }
     }
@@ -172,7 +181,8 @@ unsafe extern "system" fn enum_windows_callback(hwnd: HWND, lparam: LPARAM) -> B
         return BOOL(1);
     }
 
-    data.windows.push(WindowsWindowManager::hwnd_to_window_info(hwnd));
+    data.windows
+        .push(WindowsWindowManager::hwnd_to_window_info(hwnd));
     BOOL(1)
 }
 
@@ -215,12 +225,16 @@ impl WindowManager for WindowsWindowManager {
             0 => Err(DesktopError::WindowNotFound(format!("{:?}", target)).into()),
             1 => Ok(matched.remove(0)),
             _ => {
-                let titles: Vec<String> = matched.iter().map(|w| format!("\"{}\" (HWND: {})", w.title, w.hwnd)).collect();
+                let titles: Vec<String> = matched
+                    .iter()
+                    .map(|w| format!("\"{}\" (HWND: {})", w.title, w.hwnd))
+                    .collect();
                 Err(DesktopError::AmbiguousWindow(format!(
                     "{}件一致しました。HWNDで直接指定してください:\n{}",
                     titles.len(),
                     titles.join("\n")
-                )).into())
+                ))
+                .into())
             }
         }
     }
@@ -231,7 +245,9 @@ impl WindowManager for WindowsWindowManager {
         // 最小化されている場合はリストアしてからフォアグラウンドに移動
         let is_minimized = unsafe { IsIconic(hwnd) }.as_bool();
         if is_minimized {
-            unsafe { let _ = ShowWindow(hwnd, SW_RESTORE); }
+            unsafe {
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+            }
         }
 
         unsafe {
@@ -247,14 +263,24 @@ impl WindowManager for WindowsWindowManager {
             WindowState::Maximize => SW_MAXIMIZE,
             WindowState::Restore => SW_RESTORE,
         };
-        unsafe { let _ = ShowWindow(hwnd, cmd); };
+        unsafe {
+            let _ = ShowWindow(hwnd, cmd);
+        };
         Ok(())
     }
 
     fn resize_window(&self, hwnd: usize, width: u32, height: u32) -> Result<()> {
         let hwnd = to_hwnd(hwnd);
         unsafe {
-            SetWindowPos(hwnd, None, 0, 0, width as i32, height as i32, SWP_NOMOVE | SWP_NOZORDER)?;
+            SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                width as i32,
+                height as i32,
+                SWP_NOMOVE | SWP_NOZORDER,
+            )?;
         }
         Ok(())
     }

@@ -42,7 +42,13 @@ pub fn run_check(
     automation: &dyn UiAutomation,
 ) -> Result<()> {
     let window = manager.find_window(&args.window.resolve()?)?;
-    automation.toggle_element(window.hwnd, &args.text, Some("checkbox"), true, args.timeout)?;
+    automation.toggle_element(
+        window.hwnd,
+        &args.text,
+        Some("checkbox"),
+        true,
+        args.timeout,
+    )?;
     eprintln!("チェック: {:?} (HWND: {})", args.text, window.hwnd);
     Ok(())
 }
@@ -53,7 +59,13 @@ pub fn run_uncheck(
     automation: &dyn UiAutomation,
 ) -> Result<()> {
     let window = manager.find_window(&args.window.resolve()?)?;
-    automation.toggle_element(window.hwnd, &args.text, Some("checkbox"), false, args.timeout)?;
+    automation.toggle_element(
+        window.hwnd,
+        &args.text,
+        Some("checkbox"),
+        false,
+        args.timeout,
+    )?;
     eprintln!("チェック解除: {:?} (HWND: {})", args.text, window.hwnd);
     Ok(())
 }
@@ -86,7 +98,12 @@ pub fn run_select(
     automation: &dyn UiAutomation,
 ) -> Result<()> {
     let window = manager.find_window(&args.window.resolve()?)?;
-    automation.select_option(window.hwnd, args.element.as_deref(), &args.value, args.timeout)?;
+    automation.select_option(
+        window.hwnd,
+        args.element.as_deref(),
+        &args.value,
+        args.timeout,
+    )?;
     eprintln!("選択: {:?} (HWND: {})", args.value, window.hwnd);
     Ok(())
 }

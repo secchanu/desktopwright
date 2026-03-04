@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Args;
 
 use crate::cli::WindowTargetArgs;
@@ -71,7 +71,10 @@ pub fn run_click_element(
         find_node_by_ref(&tree, ref_num)
             .ok_or_else(|| anyhow!("ref {} に対応する要素が見つかりません", ref_str))?
     } else {
-        let text = args.text.as_deref().expect("required_unless_present=ref_id がテキストを保証する");
+        let text = args
+            .text
+            .as_deref()
+            .expect("required_unless_present=ref_id がテキストを保証する");
         let match_mode = match args.r#match {
             MatchModeArg::Contains => TextMatchMode::Contains,
             MatchModeArg::Exact => TextMatchMode::Exact,
@@ -95,13 +98,22 @@ pub fn run_click_element(
             })?
     };
 
-    let rect = node.rect.ok_or_else(|| anyhow!("要素の矩形が取得できません: {:?}", node.name))?;
+    let rect = node
+        .rect
+        .ok_or_else(|| anyhow!("要素の矩形が取得できません: {:?}", node.name))?;
 
     // UI Automationの座標はスクリーン絶対座標
     let click_x = rect.x + rect.width / 2;
     let click_y = rect.y + rect.height / 2;
 
-    input.mouse_click(click_x, click_y, MouseButton::Left, args.double, None, CoordMode::Screen)?;
+    input.mouse_click(
+        click_x,
+        click_y,
+        MouseButton::Left,
+        args.double,
+        None,
+        CoordMode::Screen,
+    )?;
 
     let result = ClickElementResult {
         name: node.name,

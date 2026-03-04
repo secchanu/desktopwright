@@ -58,7 +58,11 @@ pub fn run_list(args: &ListArgs, manager: &dyn WindowManager, json: bool) -> Res
     Ok(())
 }
 
-pub fn run_foreground(args: &ForegroundArgs, manager: &dyn WindowManager, json: bool) -> Result<()> {
+pub fn run_foreground(
+    args: &ForegroundArgs,
+    manager: &dyn WindowManager,
+    json: bool,
+) -> Result<()> {
     let window = manager.get_foreground_window()?;
     if json || matches!(args.format, OutputFormat::Json) {
         print_json(&window)?;

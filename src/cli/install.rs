@@ -1,6 +1,6 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Args;
-use include_dir::{include_dir, Dir};
+use include_dir::{Dir, include_dir};
 use std::path::PathBuf;
 
 static SKILL_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/skills/desktopwright");
@@ -19,7 +19,9 @@ pub struct InstallArgs {
 
 pub fn run_install(args: &InstallArgs) -> Result<()> {
     if !args.skills {
-        return Err(anyhow!("--skills フラグを指定してください: desktopwright install --skills"));
+        return Err(anyhow!(
+            "--skills フラグを指定してください: desktopwright install --skills"
+        ));
     }
 
     let target = resolve_target(args.global)?;
@@ -37,7 +39,9 @@ fn resolve_target(global: bool) -> Result<PathBuf> {
     if global {
         let home = std::env::var("USERPROFILE")
             .or_else(|_| std::env::var("HOME"))
-            .map_err(|_| anyhow!("ホームディレクトリが見つかりません（USERPROFILE / HOME が未設定）"))?;
+            .map_err(|_| {
+                anyhow!("ホームディレクトリが見つかりません（USERPROFILE / HOME が未設定）")
+            })?;
         Ok(PathBuf::from(home).join(".claude/skills/desktopwright"))
     } else {
         Ok(std::env::current_dir()?.join(".claude/skills/desktopwright"))

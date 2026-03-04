@@ -8,14 +8,15 @@ use anyhow::Result;
 use clap::Parser;
 
 use cli::{
+    Cli, Commands,
     app::{run_close, run_launch},
-    install::run_install,
     capture::run_capture,
     click_element::run_click_element,
     drag::{run_drag, run_mousedown, run_mouseup},
     element_action::{run_check, run_dialog_accept, run_dialog_dismiss, run_select, run_uncheck},
     focus::run_focus,
     get_text::run_get_text,
+    install::run_install,
     key::{run_key, run_keydown, run_keyup},
     list::{run_foreground, run_list},
     mouse::{run_click, run_move},
@@ -24,7 +25,6 @@ use cli::{
     ui_tree::{run_snapshot, run_ui_tree},
     wait::{run_wait, run_wait_for_window},
     window::{run_resize, run_window},
-    Cli, Commands,
 };
 
 fn main() -> Result<()> {

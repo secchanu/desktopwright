@@ -5,12 +5,12 @@ use crate::core::types::{CoordMode, MouseButton, WindowTarget};
 
 pub mod app;
 pub mod capture;
-pub mod install;
 pub mod click_element;
 pub mod drag;
 pub mod element_action;
 pub mod focus;
 pub mod get_text;
+pub mod install;
 pub mod key;
 pub mod list;
 pub mod mouse;
@@ -25,7 +25,8 @@ pub fn parse_hwnd(s: &str) -> Result<usize> {
     if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
         usize::from_str_radix(hex, 16).map_err(|e| anyhow::anyhow!("HWND解析失敗: {}", e))
     } else {
-        s.parse::<usize>().map_err(|e| anyhow::anyhow!("HWND解析失敗: {}", e))
+        s.parse::<usize>()
+            .map_err(|e| anyhow::anyhow!("HWND解析失敗: {}", e))
     }
 }
 

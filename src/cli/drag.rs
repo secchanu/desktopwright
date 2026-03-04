@@ -1,7 +1,7 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Args;
 
-use crate::cli::{parse_hwnd, ButtonArg, CoordModeArg};
+use crate::cli::{ButtonArg, CoordModeArg, parse_hwnd};
 use crate::core::platform::{InputController, UiAutomation};
 use crate::core::types::TextMatchMode;
 
@@ -100,13 +100,27 @@ pub fn run_drag(
     let hwnd_val = args.hwnd.as_ref().map(|s| parse_hwnd(s)).transpose()?;
 
     let (from_x, from_y) = resolve_position(
-        args.from_x, args.from_y, args.from_element.as_deref(), hwnd_val, automation,
+        args.from_x,
+        args.from_y,
+        args.from_element.as_deref(),
+        hwnd_val,
+        automation,
     )?;
     let (to_x, to_y) = resolve_position(
-        args.to_x, args.to_y, args.to_element.as_deref(), hwnd_val, automation,
+        args.to_x,
+        args.to_y,
+        args.to_element.as_deref(),
+        hwnd_val,
+        automation,
     )?;
 
-    input.mouse_button_down(from_x, from_y, args.button.into(), hwnd_val, args.coord.into())?;
+    input.mouse_button_down(
+        from_x,
+        from_y,
+        args.button.into(),
+        hwnd_val,
+        args.coord.into(),
+    )?;
 
     let steps = args.steps.max(1);
     for i in 1..=steps {
@@ -125,14 +139,26 @@ pub fn run_drag(
 
 pub fn run_mousedown(args: &MousedownArgs, input: &dyn InputController) -> Result<()> {
     let hwnd_val = args.hwnd.as_ref().map(|s| parse_hwnd(s)).transpose()?;
-    input.mouse_button_down(args.x, args.y, args.button.into(), hwnd_val, args.coord.into())?;
+    input.mouse_button_down(
+        args.x,
+        args.y,
+        args.button.into(),
+        hwnd_val,
+        args.coord.into(),
+    )?;
     eprintln!("mousedown: ({},{})", args.x, args.y);
     Ok(())
 }
 
 pub fn run_mouseup(args: &MouseupArgs, input: &dyn InputController) -> Result<()> {
     let hwnd_val = args.hwnd.as_ref().map(|s| parse_hwnd(s)).transpose()?;
-    input.mouse_button_up(args.x, args.y, args.button.into(), hwnd_val, args.coord.into())?;
+    input.mouse_button_up(
+        args.x,
+        args.y,
+        args.button.into(),
+        hwnd_val,
+        args.coord.into(),
+    )?;
     eprintln!("mouseup: ({},{})", args.x, args.y);
     Ok(())
 }
@@ -152,13 +178,17 @@ fn resolve_position(
             .find_element(hwnd, text, None, 0, TextMatchMode::Contains, 2000)?
             .ok_or_else(|| anyhow!("要素が見つかりません: {:?}", text))?;
 
-        let rect = node.rect.ok_or_else(|| anyhow!("要素の矩形が取得できません"))?;
+        let rect = node
+            .rect
+            .ok_or_else(|| anyhow!("要素の矩形が取得できません"))?;
         // UIA 座標はスクリーン絶対座標
         return Ok((rect.x + rect.width / 2, rect.y + rect.height / 2));
     }
 
     match (x, y) {
         (Some(px), Some(py)) => Ok((px, py)),
-        _ => Err(anyhow!("--from-x/--from-y または --from-element を指定してください")),
+        _ => Err(anyhow!(
+            "--from-x/--from-y または --from-element を指定してください"
+        )),
     }
 }

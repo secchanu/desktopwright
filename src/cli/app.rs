@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Args;
 
 use crate::cli::WindowTargetArgs;
@@ -41,6 +41,9 @@ pub fn run_launch(args: &LaunchArgs) -> Result<()> {
 pub fn run_close(args: &CloseArgs, manager: &dyn WindowManager) -> Result<()> {
     let window = manager.find_window(&args.window.resolve()?)?;
     manager.close_window(window.hwnd)?;
-    eprintln!("ウィンドウを閉じました: \"{}\" (HWND: {})", window.title, window.hwnd);
+    eprintln!(
+        "ウィンドウを閉じました: \"{}\" (HWND: {})",
+        window.title, window.hwnd
+    );
     Ok(())
 }

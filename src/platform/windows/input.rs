@@ -1,23 +1,23 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use windows::Win32::Foundation::{HANDLE, LPARAM, POINT, WPARAM};
 use windows::Win32::Graphics::Gdi::{ClientToScreen, ScreenToClient};
 use windows::Win32::System::DataExchange::{
     CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
 };
-use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+use windows::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetDoubleClickTime, MapVirtualKeyW, MOUSE_EVENT_FLAGS, SendInput, INPUT, INPUT_0,
-    INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC,
-    MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN,
-    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, VIRTUAL_KEY, VK_BACK, VK_CAPITAL,
-    VK_CONTROL, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_F1, VK_F10, VK_F11, VK_F12, VK_F2,
-    VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_HOME, VK_INSERT, VK_LEFT, VK_LWIN,
-    VK_MENU, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_SPACE, VK_TAB, VK_UP,
+    GetDoubleClickTime, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBD_EVENT_FLAGS, KEYBDINPUT,
+    KEYEVENTF_KEYUP, MAPVK_VK_TO_VSC, MOUSE_EVENT_FLAGS, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_HWHEEL,
+    MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
+    MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT,
+    MapVirtualKeyW, SendInput, VIRTUAL_KEY, VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DELETE, VK_DOWN,
+    VK_END, VK_ESCAPE, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10,
+    VK_F11, VK_F12, VK_HOME, VK_INSERT, VK_LEFT, VK_LWIN, VK_MENU, VK_NEXT, VK_PRIOR, VK_RETURN,
+    VK_RIGHT, VK_SHIFT, VK_SPACE, VK_TAB, VK_UP,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetSystemMetrics, PostMessageW, SetForegroundWindow, SM_CXSCREEN, SM_CYSCREEN,
-    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP,
+    GetSystemMetrics, PostMessageW, SM_CXSCREEN, SM_CYSCREEN, SetForegroundWindow, WM_LBUTTONDOWN,
+    WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP,
 };
 
 use crate::core::platform::InputController;
@@ -101,10 +101,7 @@ impl WindowsInputController {
 
         let modifiers: Result<Vec<VIRTUAL_KEY>> = modifier_strs
             .iter()
-            .map(|s| {
-                Self::key_name_to_vk(s)
-                    .ok_or_else(|| anyhow!("不明な修飾キー: '{}'", s))
-            })
+            .map(|s| Self::key_name_to_vk(s).ok_or_else(|| anyhow!("不明な修飾キー: '{}'", s)))
             .collect();
 
         Ok((modifiers?, main_vk))
@@ -119,7 +116,11 @@ impl WindowsInputController {
                 ki: KEYBDINPUT {
                     wVk: vk,
                     wScan: scan,
-                    dwFlags: if key_up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) },
+                    dwFlags: if key_up {
+                        KEYEVENTF_KEYUP
+                    } else {
+                        KEYBD_EVENT_FLAGS(0)
+                    },
                     time: 0,
                     dwExtraInfo: 0,
                 },
@@ -128,7 +129,12 @@ impl WindowsInputController {
     }
 
     /// スクリーン座標に変換する（CoordMode::Windowの場合はHWND基準でClientToScreenを呼ぶ）
-    fn to_screen_coords(x: i32, y: i32, hwnd: Option<usize>, mode: CoordMode) -> Result<(i32, i32)> {
+    fn to_screen_coords(
+        x: i32,
+        y: i32,
+        hwnd: Option<usize>,
+        mode: CoordMode,
+    ) -> Result<(i32, i32)> {
         match mode {
             CoordMode::Screen => Ok((x, y)),
             CoordMode::Window => {
@@ -324,11 +330,17 @@ impl InputController for WindowsInputController {
             MouseButton::Middle => (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
         };
 
-        Self::send_inputs(&[Self::make_mouse_button_input(down_flag), Self::make_mouse_button_input(up_flag)])?;
+        Self::send_inputs(&[
+            Self::make_mouse_button_input(down_flag),
+            Self::make_mouse_button_input(up_flag),
+        ])?;
 
         if double_click {
             std::thread::sleep(std::time::Duration::from_millis(click_delay_ms as u64));
-            Self::send_inputs(&[Self::make_mouse_button_input(down_flag), Self::make_mouse_button_input(up_flag)])?;
+            Self::send_inputs(&[
+                Self::make_mouse_button_input(down_flag),
+                Self::make_mouse_button_input(up_flag),
+            ])?;
         }
 
         Ok(())
@@ -395,14 +407,12 @@ impl InputController for WindowsInputController {
 
     fn send_key_down(&self, key: &str) -> Result<()> {
         // 単一キーのみ受け付ける（+区切りコンボは send_key を使う）
-        let vk = Self::key_name_to_vk(key)
-            .ok_or_else(|| anyhow!("不明なキー: '{}'", key))?;
+        let vk = Self::key_name_to_vk(key).ok_or_else(|| anyhow!("不明なキー: '{}'", key))?;
         Self::send_inputs(&[Self::make_key_input(vk, false)])
     }
 
     fn send_key_up(&self, key: &str) -> Result<()> {
-        let vk = Self::key_name_to_vk(key)
-            .ok_or_else(|| anyhow!("不明なキー: '{}'", key))?;
+        let vk = Self::key_name_to_vk(key).ok_or_else(|| anyhow!("不明なキー: '{}'", key))?;
         Self::send_inputs(&[Self::make_key_input(vk, true)])
     }
 

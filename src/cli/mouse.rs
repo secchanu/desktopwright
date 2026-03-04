@@ -1,7 +1,7 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Args;
 
-use crate::cli::{parse_hwnd, ButtonArg, CoordModeArg};
+use crate::cli::{ButtonArg, CoordModeArg, parse_hwnd};
 use crate::core::platform::InputController;
 
 #[derive(Args, Debug)]
@@ -72,7 +72,14 @@ pub fn run_click(args: &ClickArgs, input: &dyn InputController) -> Result<()> {
         let hwnd = hwnd.ok_or_else(|| anyhow!("--direct には --hwnd が必要です"))?;
         input.post_message_click(args.x, args.y, args.button.into(), hwnd, args.coord.into())?;
     } else {
-        input.mouse_click(args.x, args.y, args.button.into(), args.double, hwnd, args.coord.into())?;
+        input.mouse_click(
+            args.x,
+            args.y,
+            args.button.into(),
+            args.double,
+            hwnd,
+            args.coord.into(),
+        )?;
     }
     Ok(())
 }

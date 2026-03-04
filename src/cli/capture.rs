@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use clap::Args;
 use image::DynamicImage;
 use serde::Serialize;
@@ -126,7 +126,10 @@ pub fn run_capture(
                 (img, diff.bounding_box)
             }
             None => {
-                eprintln!("タイムアウト: {}ms 以内に変化がありませんでした", timeout_ms);
+                eprintln!(
+                    "タイムアウト: {}ms 以内に変化がありませんでした",
+                    timeout_ms
+                );
                 return Ok(());
             }
         }
@@ -155,7 +158,12 @@ pub fn run_capture(
 }
 
 fn build_region(args: &CaptureArgs) -> Option<Rect> {
-    match (args.region_x, args.region_y, args.region_width, args.region_height) {
+    match (
+        args.region_x,
+        args.region_y,
+        args.region_width,
+        args.region_height,
+    ) {
         (Some(x), Some(y), Some(w), Some(h)) => Some(Rect {
             x,
             y,

@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use uiautomation::patterns::{UIExpandCollapsePattern, UISelectionItemPattern, UITogglePattern};
 use uiautomation::types::{Handle, ToggleState};
 use uiautomation::{UIAutomation, UIElement, UITreeWalker};
@@ -17,8 +17,8 @@ impl WindowsUiAutomation {
     ///
     /// ポーリングループ内で毎回呼ぶことで、UIキャッシュを使わず最新状態を取得する。
     fn get_root_and_walker(hwnd: usize) -> Result<(UIElement, UITreeWalker)> {
-        let automation = UIAutomation::new()
-            .map_err(|e| anyhow!("UI Automation初期化失敗: {}", e))?;
+        let automation =
+            UIAutomation::new().map_err(|e| anyhow!("UI Automation初期化失敗: {}", e))?;
         let handle = Handle::from(hwnd as isize);
         let root = automation
             .element_from_handle(handle)
@@ -30,8 +30,14 @@ impl WindowsUiAutomation {
     }
 
     /// UIElementを再帰的にUiNodeに変換する
-    fn element_to_node(element: &UIElement, walker: &UITreeWalker, depth: u32, max_depth: u32) -> UiNode {
-        let control_type = element.get_control_type()
+    fn element_to_node(
+        element: &UIElement,
+        walker: &UITreeWalker,
+        depth: u32,
+        max_depth: u32,
+    ) -> UiNode {
+        let control_type = element
+            .get_control_type()
             .map(|ct| format!("{:?}", ct))
             .unwrap_or_else(|_| "Unknown".to_string());
 
@@ -43,7 +49,8 @@ impl WindowsUiAutomation {
         let focused = element.has_keyboard_focus().unwrap_or(false);
 
         // テキスト値の取得（Valueパターン対応要素のみ）
-        let value = element.get_property_value(uiautomation::types::UIProperty::ValueValue)
+        let value = element
+            .get_property_value(uiautomation::types::UIProperty::ValueValue)
             .ok()
             .and_then(|v| v.get_string().ok())
             .filter(|s| !s.is_empty());
@@ -62,7 +69,17 @@ impl WindowsUiAutomation {
             vec![]
         };
 
-        UiNode { control_type, name, class_name, automation_id, enabled, focused, value, rect, children }
+        UiNode {
+            control_type,
+            name,
+            class_name,
+            automation_id,
+            enabled,
+            focused,
+            value,
+            rect,
+            children,
+        }
     }
 
     /// UI要素ツリーをDFSで走査し、各要素に visitor を適用する（深さ上限 30）
@@ -135,7 +152,8 @@ impl WindowsUiAutomation {
         results: &mut Vec<UiNode>,
     ) {
         Self::dfs_walk(root, walker, 0, &mut |element| {
-            let Some(name) = Self::element_matches(element, text_lower, role_lower, match_mode) else {
+            let Some(name) = Self::element_matches(element, text_lower, role_lower, match_mode)
+            else {
                 return;
             };
             let rect = element.get_bounding_rectangle().ok().and_then(|r| {
@@ -143,7 +161,12 @@ impl WindowsUiAutomation {
                 let h = r.get_height();
                 // 矩形が有効な要素のみ収集する
                 if w > 0 && h > 0 {
-                    Some(Rect { x: r.get_left(), y: r.get_top(), width: w, height: h })
+                    Some(Rect {
+                        x: r.get_left(),
+                        y: r.get_top(),
+                        width: w,
+                        height: h,
+                    })
                 } else {
                     None
                 }
@@ -184,7 +207,12 @@ impl WindowsUiAutomation {
         });
     }
 
-    fn get_children(element: &UIElement, walker: &UITreeWalker, depth: u32, max_depth: u32) -> Vec<UiNode> {
+    fn get_children(
+        element: &UIElement,
+        walker: &UITreeWalker,
+        depth: u32,
+        max_depth: u32,
+    ) -> Vec<UiNode> {
         let mut children = Vec::new();
 
         let first = match walker.get_first_child(element) {
@@ -218,8 +246,8 @@ impl UiAutomationTrait for WindowsUiAutomation {
     }
 
     fn get_focused_element(&self) -> Result<Option<UiNode>> {
-        let automation = UIAutomation::new()
-            .map_err(|e| anyhow!("UI Automation初期化失敗: {}", e))?;
+        let automation =
+            UIAutomation::new().map_err(|e| anyhow!("UI Automation初期化失敗: {}", e))?;
         let walker = automation
             .get_control_view_walker()
             .map_err(|e| anyhow!("TreeWalker取得失敗: {}", e))?;
@@ -246,8 +274,12 @@ impl UiAutomationTrait for WindowsUiAutomation {
             let (root, walker) = Self::get_root_and_walker(hwnd)?;
             let mut elements: Vec<UIElement> = Vec::new();
             Self::collect_matching_elements(
-                &root, &walker, &text_lower, role_lower.as_deref(),
-                TextMatchMode::Contains, &mut elements,
+                &root,
+                &walker,
+                &text_lower,
+                role_lower.as_deref(),
+                TextMatchMode::Contains,
+                &mut elements,
             );
 
             if let Some(element) = elements.first() {
@@ -258,13 +290,19 @@ impl UiAutomationTrait for WindowsUiAutomation {
                     .get_toggle_state()
                     .map_err(|e| anyhow!("トグル状態の取得失敗: {}", e))?;
                 if (current_state == ToggleState::On) != desired_state {
-                    toggle.toggle().map_err(|e| anyhow!("トグル操作失敗: {}", e))?;
+                    toggle
+                        .toggle()
+                        .map_err(|e| anyhow!("トグル操作失敗: {}", e))?;
                 }
                 return Ok(());
             }
 
             if std::time::Instant::now() >= deadline {
-                return Err(anyhow!("要素が見つかりません: text={:?}, role={:?}", text, role));
+                return Err(anyhow!(
+                    "要素が見つかりません: text={:?}, role={:?}",
+                    text,
+                    role
+                ));
             }
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
@@ -288,8 +326,12 @@ impl UiAutomationTrait for WindowsUiAutomation {
                 let combo_lower = combo_text.to_lowercase();
                 let mut combos: Vec<UIElement> = Vec::new();
                 Self::collect_matching_elements(
-                    &root, &walker, &combo_lower, Some("combobox"),
-                    TextMatchMode::Contains, &mut combos,
+                    &root,
+                    &walker,
+                    &combo_lower,
+                    Some("combobox"),
+                    TextMatchMode::Contains,
+                    &mut combos,
                 );
                 if let Some(combo) = combos.first() {
                     let expand_result = combo.get_pattern::<UIExpandCollapsePattern>();
@@ -303,14 +345,20 @@ impl UiAutomationTrait for WindowsUiAutomation {
             // 選択肢を検索して SelectionItemPattern で選択する
             let mut items: Vec<UIElement> = Vec::new();
             Self::collect_matching_elements(
-                &root, &walker, &option_lower, None,
-                TextMatchMode::Contains, &mut items,
+                &root,
+                &walker,
+                &option_lower,
+                None,
+                TextMatchMode::Contains,
+                &mut items,
             );
 
             for item in &items {
                 let select_result = item.get_pattern::<UISelectionItemPattern>();
                 if let Ok(select) = select_result {
-                    select.select().map_err(|e| anyhow!("選択操作失敗: {}", e))?;
+                    select
+                        .select()
+                        .map_err(|e| anyhow!("選択操作失敗: {}", e))?;
                     return Ok(());
                 }
             }
@@ -339,7 +387,12 @@ impl UiAutomationTrait for WindowsUiAutomation {
             let (root, walker) = Self::get_root_and_walker(hwnd)?;
             let mut results = Vec::new();
             Self::collect_matching(
-                &root, &walker, &text_lower, role_lower.as_deref(), match_mode, &mut results,
+                &root,
+                &walker,
+                &text_lower,
+                role_lower.as_deref(),
+                match_mode,
+                &mut results,
             );
 
             if results.len() > index {
