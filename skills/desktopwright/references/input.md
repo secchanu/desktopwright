@@ -37,6 +37,22 @@ desktopwright click --x 400 --y 200 --coord window --hwnd 132456
 
 **注意**: `capture --hwnd n` の画像座標をスクリーン座標として `click --x 400 --y 200`（`--coord screen`）に使うと、ウィンドウ位置分だけズレる。必ず `--coord window --hwnd <n>` を使うこと。
 
+> **重要: `--max-width` / `--max-height` でリサイズした画像の座標は使えない**
+> 縮小された画像上の座標をそのまま `--coord window` に渡すと、縮小率分だけ座標がズレる。
+> クリック座標を特定するためのキャプチャは必ずリサイズなしで行うこと。
+
+### 座標の事前確認（--cursor を使った検証）
+
+クリック前に座標が正しいか確認するには、`move` で移動したあと `capture --cursor` で赤いクロスヘアを撮影する。
+
+```bash
+# クリック前の座標確認
+desktopwright move --x 400 --y 200 --coord window --hwnd 132456
+desktopwright capture --hwnd 132456 --cursor --output verify.png
+# verify.png でクロスヘアが目的の要素上にあるか確認してからクリックする
+desktopwright click --x 400 --y 200 --coord window --hwnd 132456
+```
+
 ### スクリーン絶対座標（デスクトップ全体操作時）
 
 ウィンドウに紐付かないデスクトップ上の座標を指定したい場合のみ使う。

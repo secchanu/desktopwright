@@ -126,20 +126,67 @@ impl WindowsScreenCapture {
         };
 
         let red = Rgba([255u8, 0, 0, 255]);
-        let arm = 12i32;
 
-        // 水平線
-        for dx in -arm..=arm {
-            let px = cx + dx;
-            if px >= 0 && px < img_w {
-                rgba_img.put_pixel(px as u32, cy as u32, red);
+        // フィボナッチ目盛り: (中心からの距離px, 目盛りの半幅px)
+        // 近いほど密・小さく、遠いほど疎・大きくして読みやすくする
+        let ticks: &[(i32, i32)] = &[
+            (3, 2),
+            (5, 2),
+            (8, 3),
+            (13, 3),
+            (21, 4),
+            (34, 4),
+            (55, 5),
+            (89, 5),
+        ];
+
+        // 画像端まで伸びるダッシュ腕（3px on / 2px off）
+        // d=1,2 はスキップして中心周辺に 2px のクリアゾーンを設ける。
+        // これにより ±2px 以内の背景ピクセル（クリック対象など）が透けて見え、
+        // 1px 単位のズレを目視で確認できる。
+        for d in 3..img_w.max(img_h) {
+            if (d % 5) < 3 {
+                let pairs: [(i32, i32); 4] =
+                    [(cx + d, cy), (cx - d, cy), (cx, cy + d), (cx, cy - d)];
+                for (px, py) in pairs {
+                    if px >= 0 && px < img_w && py >= 0 && py < img_h {
+                        rgba_img.put_pixel(px as u32, py as u32, red);
+                    }
+                }
             }
         }
-        // 垂直線
-        for dy in -arm..=arm {
-            let py = cy + dy;
-            if py >= 0 && py < img_h {
-                rgba_img.put_pixel(cx as u32, py as u32, red);
+
+        // 中心の 1px 白マーカー（正確なカーソル位置を示す）
+        // 白にすることで背景色に依らず視認できる。
+        // ±2px のクリアゾーンと組み合わせて、中心付近のターゲットピクセルを隠さない。
+        let white = Rgba([255u8, 255u8, 255u8, 255]);
+        if cx >= 0 && cx < img_w && cy >= 0 && cy < img_h {
+            rgba_img.put_pixel(cx as u32, cy as u32, white);
+        }
+
+        // フィボナッチ目盛りを腕に垂直に描く
+        for &(dist, half) in ticks {
+            for sign in [-1i32, 1] {
+                // 水平腕の目盛り（垂直方向の線）
+                let px = cx + sign * dist;
+                if px >= 0 && px < img_w {
+                    for dy in -half..=half {
+                        let py = cy + dy;
+                        if py >= 0 && py < img_h {
+                            rgba_img.put_pixel(px as u32, py as u32, red);
+                        }
+                    }
+                }
+                // 垂直腕の目盛り（水平方向の線）
+                let py = cy + sign * dist;
+                if py >= 0 && py < img_h {
+                    for dx in -half..=half {
+                        let px = cx + dx;
+                        if px >= 0 && px < img_w {
+                            rgba_img.put_pixel(px as u32, py as u32, red);
+                        }
+                    }
+                }
             }
         }
     }
