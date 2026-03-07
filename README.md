@@ -7,8 +7,10 @@ GUI automation CLI tool for AI agents and E2E testing. Inspect UI elements, clic
 ## Features
 
 - **Accessibility-first**: inspect UI trees via the platform's accessibility API and interact by element name or `[ref=eN]` — no fragile coordinates required
+- **Coordinate targeting for non-UIA apps**: GPU-rendered, canvas, and custom-drawn apps that don't expose accessibility elements can be driven with pixel-accurate coordinate clicks
+- **Cursor overlay verification**: `capture --cursor` draws a visual overlay with a 1px white marker and Fibonacci tick marks so you can iteratively confirm and refine click coordinates before committing
 - **Screenshot capture**: capture any window and detect visual changes with `--wait-for-diff`
-- **Pixel-accurate clicking**: coordinates from `capture --hwnd N` can be passed directly to `click --coord window --hwnd N` — no DPI scaling math required, even across multi-monitor setups
+- **Pixel-accurate clicking**: coordinates from `capture --hwnd N` map directly to `click --coord window --hwnd N` — no DPI scaling math, works across multi-monitor setups
 - **Full input control**: mouse, keyboard, drag, scroll
 - **JSON output**: every command supports `--json` for machine-readable results
 - **AI agent ready**: install a [Claude Code](https://github.com/anthropics/claude-code) skill with a single command so any Claude session can drive it immediately
@@ -66,14 +68,16 @@ See `desktopwright --help` or the [skill documentation](skills/desktopwright/SKI
 `snapshot` outputs an accessibility tree in YAML, assigning a `[ref=eN]` identifier to each visible element:
 
 ```yaml
-# snapshot: "メモ帳" (HWND: 132456)
-- window "無題 - メモ帳" [ref=e1]:
+# snapshot: "My App" (HWND: 132456)
+- window "My App" [ref=e1]:
   - menubar [ref=e2]:
-    - menuitem "ファイル(F)" [ref=e3]
-    - menuitem "編集(E)" [ref=e4]
-  - edit [ref=e5]
-  - statusbar [ref=e6]:
-    - text "1行, 1列" [ref=e7]
+    - menuitem "File" [ref=e3]
+    - menuitem "Edit" [ref=e4]
+  - edit [ref=e5]:
+    - value: "current text"
+  - button "OK" [ref=e6]
+  - statusbar [ref=e7]:
+    - text "Ready" [ref=e8]
 ```
 
 Use `click-element --ref eN` to interact by ref without specifying coordinates.
@@ -102,6 +106,15 @@ desktopwright install --skills --global
 ```
 
 Once installed, Claude will automatically load the skill and can execute desktopwright commands directly.
+
+## Specific tasks
+
+The installed skill includes detailed reference guides:
+
+* **UI element interaction** — snapshot, refs, check/uncheck/select, get-text
+* **Coordinate-based targeting** — cursor overlay, iterative refinement, diff verification
+* **App lifecycle & timing** — launch, wait-for-window, window state, focus
+* **E2E testing patterns** — full test flows, assertions, dialog handling
 
 ## Build from source
 

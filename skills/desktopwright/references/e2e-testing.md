@@ -1,186 +1,176 @@
-# E2E Testing
+# E2E Testing Patterns
 
-アプリを自動操作して動作を検証する（AIによるE2Eテスト）のパターンを説明する。
+Patterns for automating and verifying Windows desktop application behavior.
 
----
-
-## アプリのライフサイクル管理
-
-### アプリを起動する
+## Basic test structure
 
 ```bash
-# 起動して 1 秒待つ（ウィンドウ出現を待つため）
-desktopwright launch "C:\path\to\app.exe" --delay 1000
-
-# 引数を渡す場合
-desktopwright launch "C:\path\to\app.exe" "arg1" "arg2"
-
-# 起動直後に wait-for-window で確実に待機する場合（--delay は不要）
+# 1. Launch
 desktopwright launch "C:\path\to\app.exe"
-desktopwright wait-for-window --process "app" --timeout 10000
-```
+desktopwright wait-for-window --process "myapp" --timeout 10000
+desktopwright --json list --process "myapp"
 
-### ウィンドウが現れるまで待機する
+# 2. Interact
+desktopwright snapshot --hwnd 132456
+desktopwright click-element --hwnd 132456 --ref e5
+desktopwright type "test input"
 
-```bash
-# プロセス名で待機（起動直後はウィンドウが出ていない場合がある）
-desktopwright wait-for-window --process "notepad" --timeout 10000
-
-# タイトルで待機
-desktopwright wait-for-window --target "無題" --timeout 5000
-
-# JSON でウィンドウ情報を取得する（HWND を後続コマンドに渡せる）
-desktopwright --json wait-for-window --process "app" --timeout 10000
-# → { "hwnd": 132456, "title": "...", ... }
-```
-
-### アプリを閉じる
-
-```bash
-# HWND 直接指定
-desktopwright close --hwnd 132456
-
-# タイトルで指定
-desktopwright close --target "無題 - メモ帳"
-
-# プロセス名で指定
-desktopwright close --process "notepad"
-```
-
----
-
-## タイミング制御
-
-### 操作の間に待機を挟む
-
-```bash
-# 固定時間待機（アニメーション完了などを待つ場合）
-desktopwright wait 500
-
-# 変化検出付きキャプチャで待機（推奨）
-desktopwright capture --hwnd 132456 --wait-for-diff 3000 --output after.png
-# → 画面が変化した時点で保存される。タイムアウトした場合は現在の画面を保存。
-```
-
-固定時間の `wait` は確実性が低い。可能なかぎり `capture --wait-for-diff` を使うこと。
-
----
-
-## テキスト値の取得（アサーション）
-
-UIA 経由でUI要素の値を取得する。結果は stdout に出力される。
-
-```bash
-# 入力フィールドの現在値を取得（value を返す）
-desktopwright get-text --hwnd 132456 --text "Username" --role edit
-
-# ラベルやテキスト要素の内容を取得（name を返す）
-desktopwright get-text --hwnd 132456 --text "Status" --role text
-
-# 完全一致モード（部分一致だと複数ヒットする場合に使う）
-desktopwright get-text --hwnd 132456 --text "Count: 5" --exact
-
-# タイムアウト指定
-desktopwright get-text --hwnd 132456 --text "Result" --timeout 10000
-```
-
-### シェルスクリプトでのアサーション例
-
-```bash
+# 3. Verify
+desktopwright capture --hwnd 132456 --wait-for-diff 3000 --output result.png
 result=$(desktopwright get-text --hwnd 132456 --text "Status" --role text)
-if [ "$result" = "完了" ]; then
-    echo "PASS: ステータスが「完了」になった"
+
+# 4. Teardown
+desktopwright close --hwnd 132456
+```
+
+## UIA-based test
+
+For apps with accessible UI elements:
+
+```bash
+desktopwright launch "C:\path\to\app.exe"
+# --json returns { "hwnd": 132456, ... } immediately when the window appears
+hwnd=$(desktopwright --json wait-for-window --process "myapp" --timeout 5000 | grep -o '"hwnd":[0-9]*' | grep -o '[0-9]*')
+
+# Fill a form
+desktopwright snapshot --hwnd $hwnd
+desktopwright click-element --hwnd $hwnd --text "Name" --role edit
+desktopwright type "Test User"
+desktopwright click-element --hwnd $hwnd --text "Submit" --role button
+
+# Wait for confirmation and assert
+desktopwright capture --hwnd $hwnd --wait-for-diff 5000 --output confirm.png
+status=$(desktopwright get-text --hwnd $hwnd --text "Result" --role text)
+
+desktopwright close --hwnd $hwnd
+```
+
+## Coordinate-based test (UIA unavailable)
+
+For GPU-rendered or custom-drawn apps:
+
+```bash
+desktopwright launch "C:\path\to\app.exe"
+desktopwright wait-for-window --process "myapp" --timeout 10000
+
+# Verify UIA is unavailable
+desktopwright snapshot --hwnd 132456
+# → "- window "My App" [ref=e1]:" with no children
+
+# Capture and identify button location visually
+desktopwright capture --hwnd 132456 --output screen.png
+
+# Verify cursor before clicking
+desktopwright move --x 200 --y 150 --coord window --hwnd 132456
+desktopwright capture --hwnd 132456 --cursor --output verify.png
+# Inspect verify.png: white dot should be on the button
+
+desktopwright click --x 200 --y 150 --coord window --hwnd 132456
+desktopwright capture --hwnd 132456 --wait-for-diff 3000 --output after.png
+
+desktopwright close --hwnd 132456
+```
+
+## Assertions
+
+### Text value assertion
+
+```bash
+actual=$(desktopwright get-text --hwnd 132456 --text "Count" --role text)
+expected="42"
+if [ "$actual" = "$expected" ]; then
+    echo "PASS"
 else
-    echo "FAIL: 期待値=完了, 実際=$result"
+    echo "FAIL: expected=$expected actual=$actual"
     exit 1
 fi
 ```
 
----
-
-## UIAが使えないアプリの操作
-
-gpui / DirectX / OpenGL などGPUレンダリングアプリは UIA が効かない場合がある。
-この場合は capture + 座標クリックで操作する。
+### Visual change assertion
 
 ```bash
-# 1. 画面をキャプチャして確認
-desktopwright capture --hwnd <HWND> --output screen.png
-
-# 2. 画像上の座標からクリック（capture --hwnd の画像座標 = ウィンドウ内座標）
-desktopwright focus --hwnd <HWND>
-desktopwright click --x 400 --y 300 --coord window --hwnd <HWND>
-
-# 3. 操作後にキャプチャして変化を確認
-desktopwright capture --hwnd <HWND> --output after.png
+desktopwright click-element --hwnd 132456 --ref e5
+# Capture with wait-for-diff: empty stdout = no change occurred (fail)
+output=$(desktopwright capture --hwnd 132456 --wait-for-diff 3000 --output after.png)
+if [ -z "$output" ]; then
+    echo "FAIL: no UI change after action"
+    exit 1
+fi
 ```
 
-### UIA対応状況の確認
+### JSON-based assertion
 
 ```bash
-# snapshot を試して出力があれば UIA 対応
-desktopwright snapshot --hwnd <HWND>
-# → 要素なし または window のみ: UIA 非対応
-
-# ui-tree で詳細確認
-desktopwright ui-tree --hwnd <HWND>
+result=$(desktopwright --json click-element --hwnd 132456 --text "OK" --role button)
+# result contains: { "name": "OK", "role": "button", "rect": {...}, "click_x": 400, "click_y": 200 }
 ```
 
----
-
-## 典型的なE2Eテストフロー
-
-### メモ帳でファイルを開いて内容を確認する
+## Dialog handling
 
 ```bash
-# 1. メモ帳を起動
-desktopwright launch "notepad.exe" "C:\path\to\file.txt"
+# Trigger an action that may show a dialog
+desktopwright click-element --hwnd 132456 --text "Delete" --role button
 
-# 2. ウィンドウ出現を待機
-desktopwright wait-for-window --process "notepad" --timeout 5000
+# Wait for dialog window to appear
+desktopwright wait-for-window --target "Confirm" --timeout 3000
 
-# 3. HWND を確認
-desktopwright list
+# Accept or dismiss
+desktopwright dialog-accept
+# or
+desktopwright dialog-dismiss
 
-# 4. 内容をキャプチャして確認
-desktopwright capture --hwnd 132456 --output content.png
-
-# 5. Edit 要素のテキストを取得
-desktopwright get-text --hwnd 132456 --role edit
-
-# 6. メモ帳を閉じる
-desktopwright close --hwnd 132456
+# Verify dialog is gone and app state changed
+desktopwright capture --hwnd 132456 --wait-for-diff 2000 --output after-dialog.png
 ```
 
-### ダイアログが出ることを確認する
+## Save dialog / file picker
 
 ```bash
-# 操作を実行
-desktopwright click-element --hwnd 132456 --text "削除" --role button
+# Trigger save (e.g., Ctrl+S opens a file save dialog)
+desktopwright focus --hwnd 132456
+desktopwright key ctrl+s
 
-# ダイアログが現れるまで待機（タイトルで待機）
-desktopwright wait-for-window --target "確認" --timeout 3000
+# Wait for file dialog window
+desktopwright wait-for-window --target "Save" --timeout 3000
+desktopwright list  # find dialog HWND
 
-# ダイアログのHWNDを取得して確認
-desktopwright list
-
-# ダイアログを承認
-desktopwright dialog-accept --target "確認"
+# Interact with dialog via UIA (standard file dialogs support UIA)
+desktopwright snapshot --hwnd 99999
+desktopwright click-element --hwnd 99999 --text "File name" --role edit
+desktopwright type "output.txt"
+desktopwright click-element --hwnd 99999 --text "Save" --role button
 ```
 
----
+## Best practices
 
-## UIA が使えないアプリ向けの差分検出テスト
+### Always verify after interaction
+
+Never assume an operation succeeded. Capture after every significant action:
 
 ```bash
-# ボタンをクリックする前のキャプチャ
-desktopwright capture --hwnd <HWND> --output before.png
-
-# ボタンをクリック（座標指定）
-desktopwright click --x 200 --y 150 --coord window --hwnd <HWND>
-
-# 変化を待ってキャプチャ（最大 3 秒）
-desktopwright capture --hwnd <HWND> --wait-for-diff 3000 --output after.png
-# JSON で変化領域も確認
-desktopwright --json capture --hwnd <HWND> --wait-for-diff 3000 --output after.png
+desktopwright click-element --hwnd 132456 --ref e9
+desktopwright capture --hwnd 132456 --wait-for-diff 3000 --output after.png
+# Inspect after.png before proceeding
 ```
+
+### Use `--json list` to get HWND programmatically
+
+```bash
+desktopwright --json list --process "myapp"
+# → [{ "hwnd": 132456, "title": "My App", "pid": 5678, ... }]
+```
+
+### Prefer `wait-for-window` over fixed delays after launch
+
+```bash
+# Preferred
+desktopwright launch "C:\path\to\app.exe"
+desktopwright wait-for-window --process "myapp" --timeout 10000
+
+# Avoid
+desktopwright launch "C:\path\to\app.exe" --delay 3000  # may be too short or too long
+```
+
+### UAC-elevated apps require elevated desktopwright
+
+If `focus` fails or clicks have no effect on an admin-mode app, run desktopwright from an elevated shell (Run as Administrator).
